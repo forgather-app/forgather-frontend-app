@@ -1,3 +1,4 @@
+import { login } from '@react-native-seoul/kakao-login';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -7,7 +8,7 @@ import {
   SafeAreaView,
   View,
 } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 const WEB_URL = __DEV__ ? 'https://dev.forgather.app' : 'https://forgather.me';
 
@@ -72,6 +73,24 @@ const App = () => {
     return false;
   };
 
+  const onMessage = async (event: WebViewMessageEvent) => {
+    try {
+      const { type } = JSON.parse(event.nativeEvent.data);
+      if (type === 'KAKAO_LOGIN') {
+        const { accessToken, idToken } = await login();
+        const payload = JSON.stringify({
+          type: 'KAKAO_TOKEN',
+          payload: { access_token: accessToken, id_token: idToken },
+        });
+        ref.current?.injectJavaScript(
+          `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(payload)} })); true;`,
+        );
+      }
+    } catch (e) {
+      console.error('[KakaoLogin] onMessage failed:', e);
+    }
+  };
+
   const injectedBefore = `
         (function() {
           window.open = function(url){ window.location.href = url; };
@@ -107,6 +126,7 @@ const App = () => {
         onNavigationStateChange={s => setCanGoBack(s.canGoBack)}
         onLoadEnd={() => setLoading(false)}
         onShouldStartLoadWithRequest={onShouldStart}
+        onMessage={onMessage}
         onCreateWindow={() => false}
         onFileDownload={({ nativeEvent }) => {
           Linking.openURL(nativeEvent.downloadUrl);
