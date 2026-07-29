@@ -30,5 +30,22 @@ target 'forgatherApp' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Xcode 26.4 (Apple Clang 21) is stricter about consteval and breaks the
+    # fmt 11.0.2 that RN 0.83.1 bundles ("Call to consteval function ... is
+    # not a constant expression"). Force FMT_USE_CONSTEVAL off so fmt falls
+    # back to runtime format-string checks. Remove once RN ships fmt >= 12.1.0.
+    fmt_base_header = File.join(__dir__, 'Pods', 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base_header)
+      contents = File.read(fmt_base_header)
+      patched = contents.sub(
+        "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 1",
+        "#elif defined(__cpp_consteval)\n#  define FMT_USE_CONSTEVAL 0"
+      )
+      if patched != contents
+        File.chmod(0644, fmt_base_header)
+        File.write(fmt_base_header, patched)
+      end
+    end
   end
 end
