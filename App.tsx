@@ -1,3 +1,4 @@
+import { login } from '@react-native-seoul/kakao-login';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -6,11 +7,11 @@ import {
   Platform,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 const WEB_URL = __DEV__ ? 'https://dev.forgather.app' : 'https://forgather.app';
 
-const MY_DOMAINS = ['dev.forgather.app', 'forgather.app'];
+const MY_DOMAINS = ['dev.forgather.app', 'forgather.app', 'localhost'];
 const KAKAO_DOMAINS = ['kauth.kakao.com', 'accounts.kakao.com', 'kakao.com'];
 
 const allowedHost = (host: string) =>
@@ -21,6 +22,7 @@ const allowedHost = (host: string) =>
 const App = () => {
   const ref = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const kakaoLoginInFlight = useRef(false);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -67,9 +69,101 @@ const App = () => {
     return false;
   };
 
+  const onMessage = async (event: WebViewMessageEvent) => {
+    console.error('[KakaoLogin] RAW onMessage:', event.nativeEvent.data);
+    try {
+      const { type } = JSON.parse(event.nativeEvent.data);
+      console.error('[KakaoLogin] parsed type:', type);
+      if (type === 'NET_LOG') {
+        const { payload } = JSON.parse(event.nativeEvent.data);
+        console.error('[NET_LOG]', JSON.stringify(payload));
+        return;
+      }
+      if (type === 'KAKAO_LOGIN') {
+        if (kakaoLoginInFlight.current) {
+          console.error('[KakaoLogin] login already in flight, ignoring');
+          return;
+        }
+        kakaoLoginInFlight.current = true;
+        try {
+          console.error('[KakaoLogin] calling native login()...');
+          const { accessToken, idToken } = await login();
+          console.error(
+            '[KakaoLogin] login() success, accessToken length:',
+            accessToken?.length,
+            'idToken:',
+            idToken,
+          );
+          const payload = JSON.stringify({
+            type: 'KAKAO_TOKEN',
+            payload: { access_token: accessToken, id_token: idToken },
+          });
+          console.error('[KakaoLogin] injecting KAKAO_TOKEN payload:', payload);
+          ref.current?.injectJavaScript(
+            `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+              payload,
+            )} })); true;`,
+          );
+          console.error('[KakaoLogin] injectJavaScript called');
+        } finally {
+          kakaoLoginInFlight.current = false;
+        }
+      }
+    } catch (e) {
+      console.error('[KakaoLogin] onMessage failed:', e);
+    }
+  };
+
   const injectedBefore = `
         (function() {
           window.open = function(url){ window.location.href = url; };
+
+          var origFetch = window.fetch;
+          window.fetch = function() {
+            var args = arguments;
+            var url = args[0] && args[0].url ? args[0].url : args[0];
+            return origFetch.apply(this, args).then(function(res) {
+              try {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'NET_LOG',
+                  payload: { url: String(url), status: res.status, ok: res.ok, cookies: document.cookie },
+                }));
+              } catch (e) {}
+              return res;
+            }).catch(function(err) {
+              try {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'NET_LOG',
+                  payload: { url: String(url), error: String(err), cookies: document.cookie },
+                }));
+              } catch (e) {}
+              throw err;
+            });
+          };
+
+          var origOpen = XMLHttpRequest.prototype.open;
+          var origSend = XMLHttpRequest.prototype.send;
+          XMLHttpRequest.prototype.open = function(method, url) {
+            this.__logUrl = url;
+            return origOpen.apply(this, arguments);
+          };
+          XMLHttpRequest.prototype.send = function() {
+            var xhr = this;
+            xhr.addEventListener('loadend', function() {
+              try {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'NET_LOG',
+                  payload: {
+                    url: String(xhr.__logUrl),
+                    status: xhr.status,
+                    cookies: document.cookie,
+                    responseText: String(xhr.responseText).slice(0, 500),
+                  },
+                }));
+              } catch (e) {}
+            });
+            return origSend.apply(this, arguments);
+          };
         })(); true;
       `;
 
@@ -90,6 +184,7 @@ const App = () => {
           pullToRefreshEnabled={Platform.OS === 'android'}
           onNavigationStateChange={s => setCanGoBack(s.canGoBack)}
           onShouldStartLoadWithRequest={onShouldStart}
+          onMessage={onMessage}
           onFileDownload={({ nativeEvent }) => {
             Linking.openURL(nativeEvent.downloadUrl);
           }}
