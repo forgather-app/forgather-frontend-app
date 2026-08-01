@@ -105,6 +105,17 @@ const App = () => {
             )} })); true;`,
           );
           console.error('[KakaoLogin] injectJavaScript called');
+        } catch (e) {
+          console.error('[KakaoLogin] login() failed or cancelled:', e);
+          const errorPayload = JSON.stringify({
+            type: 'KAKAO_LOGIN_ERROR',
+            payload: { message: String(e) },
+          });
+          ref.current?.injectJavaScript(
+            `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+              errorPayload,
+            )} })); true;`,
+          );
         } finally {
           kakaoLoginInFlight.current = false;
         }
