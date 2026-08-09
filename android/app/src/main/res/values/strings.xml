@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">forgatherApp</string>
+    <string name="kakao_app_key">6190bb85090cb16a87823f1431f26246</string>
 </resources>
