@@ -9,7 +9,10 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
-const WEB_URL = __DEV__ ? 'https://dev.forgather.app' : 'https://forgather.app';
+// const WEB_URL = __DEV__
+//   ? 'https://dev.forgather.app/login'
+//   : 'https://forgather.app';
+const WEB_URL = 'https://dev.forgather.app';
 
 const MY_DOMAINS = ['dev.forgather.app', 'forgather.app', 'localhost'];
 const KAKAO_DOMAINS = ['kauth.kakao.com', 'accounts.kakao.com', 'kakao.com'];
