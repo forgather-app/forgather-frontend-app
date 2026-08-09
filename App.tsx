@@ -1,11 +1,18 @@
+import {
+  CameraRoll,
+  iosReadGalleryPermission,
+  iosRequestAddOnlyGalleryPermission,
+} from '@react-native-camera-roll/camera-roll';
 import { login } from '@react-native-seoul/kakao-login';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   BackHandler,
   Linking,
+  PermissionsAndroid,
   Platform,
 } from 'react-native';
+import ReactNativeBlobUtil from 'react-native-blob-util';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import appleAuth from '@invertase/react-native-apple-authentication';
@@ -33,6 +40,59 @@ const allowedHost = (host: string) =>
   [...MY_DOMAINS, ...KAKAO_DOMAINS].some(
     h => host === h || host.endsWith(`.${h}`),
   );
+
+type SaveImagePayload = { url: string; filename?: string };
+
+const guessImageExtension = ({ filename, url }: SaveImagePayload) => {
+  const match = (filename || url).match(/\.([a-zA-Z0-9]+)(?:\?.*)?$/);
+  return match ? match[1].toLowerCase() : 'jpg';
+};
+
+class PhotoPermissionDeniedError extends Error {}
+
+const hasPhotoLibraryPermission = async () => {
+  if (Platform.OS === 'android') {
+    const permission =
+      Platform.Version >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+
+    if (await PermissionsAndroid.check(permission)) {
+      return true;
+    }
+    const status = await PermissionsAndroid.request(permission);
+    return status === PermissionsAndroid.RESULTS.GRANTED;
+  }
+
+  const status = await iosReadGalleryPermission('addOnly');
+  if (status === 'granted' || status === 'limited') {
+    return true;
+  }
+  if (status === 'not-determined') {
+    const requested = await iosRequestAddOnlyGalleryPermission();
+    return requested === 'granted' || requested === 'limited';
+  }
+  return false;
+};
+
+const saveImageToDevice = async ({ url, filename }: SaveImagePayload) => {
+  if (!(await hasPhotoLibraryPermission())) {
+    throw new PhotoPermissionDeniedError('Photo library permission denied');
+  }
+
+  const res = await ReactNativeBlobUtil.config({
+    fileCache: true,
+    appendExt: guessImageExtension({ url, filename }),
+  }).fetch('GET', url);
+
+  try {
+    const path = res.path();
+    const localUri = path.startsWith('file://') ? path : `file://${path}`;
+    await CameraRoll.saveAsset(localUri, { type: 'photo' });
+  } finally {
+    res.flush();
+  }
+};
 
 const App = () => {
   const ref = useRef<WebView>(null);
@@ -82,6 +142,15 @@ const App = () => {
 
     Linking.openURL(url).catch(() => {});
     return false;
+  };
+
+  const postToWeb = (type: string) => {
+    const message = JSON.stringify({ type });
+    ref.current?.injectJavaScript(
+      `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+        message,
+      )} })); true;`,
+    );
   };
 
   const onMessage = async (event: WebViewMessageEvent) => {
@@ -139,6 +208,24 @@ const App = () => {
           kakaoLoginInFlight.current = false;
         }
       }
+      if (type === 'SAVE_IMAGE' || type === 'SAVE_IMAGES') {
+        const { payload } = JSON.parse(event.nativeEvent.data);
+        const images: SaveImagePayload[] =
+          type === 'SAVE_IMAGE' ? [payload] : payload.images;
+        try {
+          for (const image of images) {
+            await saveImageToDevice(image);
+          }
+          postToWeb('SAVE_IMAGE_SUCCESS');
+        } catch (e) {
+          console.error('[SaveImage] failed:', e);
+          postToWeb(
+            e instanceof PhotoPermissionDeniedError
+              ? 'SAVE_IMAGE_PERMISSION_DENIED'
+              : 'SAVE_IMAGE_ERROR',
+          );
+        }
+      }
     } catch (e) {
       console.error('[KakaoLogin] onMessage failed:', e);
     }
@@ -146,20 +233,47 @@ const App = () => {
 
   const injectedBefore = `
         (function() {
+          function captureToken(text) {
+            try {
+              var json = JSON.parse(text);
+              var token = json && json.data && json.data.accessToken;
+              if (token) {
+                window.__accessToken = token;
+                try {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'NET_LOG',
+                    payload: { url: '[TOKEN_CAPTURED]', tokenLength: token.length },
+                  }));
+                } catch (e) {}
+              }
+            } catch (e) {}
+          }
+
           window.open = function(url){ window.location.href = url; };
 
           var origFetch = window.fetch;
           window.fetch = function() {
             var args = arguments;
             var url = args[0] && args[0].url ? args[0].url : args[0];
+            if (window.__accessToken) {
+              var init = Object.assign({}, args[1] || {});
+              var headers = new Headers(init.headers || {});
+              if (!headers.has('Authorization')) {
+                headers.set('Authorization', 'Bearer ' + window.__accessToken);
+              }
+              init.headers = headers;
+              args = [args[0], init];
+            }
             return origFetch.apply(this, args).then(function(res) {
-              try {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'NET_LOG',
-                  payload: { url: String(url), status: res.status, ok: res.ok, cookies: document.cookie },
-                }));
-              } catch (e) {}
-              return res;
+              return res.clone().text().then(captureToken).catch(function() {}).then(function() {
+                try {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'NET_LOG',
+                    payload: { url: String(url), status: res.status, ok: res.ok, cookies: document.cookie },
+                  }));
+                } catch (e) {}
+                return res;
+              });
             }).catch(function(err) {
               try {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
@@ -179,7 +293,13 @@ const App = () => {
           };
           XMLHttpRequest.prototype.send = function() {
             var xhr = this;
+            if (window.__accessToken) {
+              try {
+                xhr.setRequestHeader('Authorization', 'Bearer ' + window.__accessToken);
+              } catch (e) {}
+            }
             xhr.addEventListener('loadend', function() {
+              captureToken(xhr.responseText);
               try {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'NET_LOG',
