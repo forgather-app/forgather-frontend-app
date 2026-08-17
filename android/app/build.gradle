@@ -116,4 +116,8 @@ dependencies {
     } else {
         implementation jscFlavor
     }
+
+    // react-native-image-picker: minSdkVersion(24)이 30 미만이라 백포트된
+    // AndroidX Photo Picker를 쓰려면 명시적으로 필요
+    implementation("androidx.activity:activity:1.9.+")
 }
