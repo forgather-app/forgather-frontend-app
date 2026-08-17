@@ -41,6 +41,17 @@ const allowedHost = (host: string) =>
     h => host === h || host.endsWith(`.${h}`),
   );
 
+const isOurWebUrl = (host: string) =>
+  MY_DOMAINS.some(h => host === h || host.endsWith(`.${h}`));
+
+const toWebViewTarget = (url: string) => {
+  if (!/^https?:\/\//i.test(url)) {
+    return null;
+  }
+  const host = url.split('/')[2]?.split(':')[0] || '';
+  return isOurWebUrl(host) ? url : null;
+};
+
 type SaveImagePayload = { url: string; filename?: string };
 
 const guessImageExtension = ({ filename, url }: SaveImagePayload) => {
@@ -97,7 +108,23 @@ const saveImageToDevice = async ({ url, filename }: SaveImagePayload) => {
 const App = () => {
   const ref = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [sourceUri, setSourceUri] = useState(WEB_URL);
   const kakaoLoginInFlight = useRef(false);
+
+  useEffect(() => {
+    const handleIncomingUrl = (url: string | null) => {
+      const target = url && toWebViewTarget(url);
+      if (target) {
+        setSourceUri(target);
+      }
+    };
+
+    Linking.getInitialURL().then(handleIncomingUrl);
+    const sub = Linking.addEventListener('url', ({ url }) =>
+      handleIncomingUrl(url),
+    );
+    return () => sub.remove();
+  }, []);
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -376,7 +403,7 @@ const App = () => {
       <SafeAreaView style={{ flex: 1 }}>
         <WebView
           ref={ref}
-          source={{ uri: WEB_URL }}
+          source={{ uri: sourceUri }}
           renderLoading={() => <ActivityIndicator size="large" />}
           domStorageEnabled
           javaScriptEnabled
