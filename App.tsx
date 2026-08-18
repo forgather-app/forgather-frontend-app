@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import appleAuth from '@invertase/react-native-apple-authentication';
@@ -48,6 +49,17 @@ const allowedHost = (host: string) =>
   [...MY_DOMAINS, ...KAKAO_DOMAINS].some(
     h => host === h || host.endsWith(`.${h}`),
   );
+
+const isOurWebUrl = (host: string) =>
+  MY_DOMAINS.some(h => host === h || host.endsWith(`.${h}`));
+
+const toWebViewTarget = (url: string) => {
+  if (!/^https?:\/\//i.test(url)) {
+    return null;
+  }
+  const host = url.split('/')[2]?.split(':')[0] || '';
+  return isOurWebUrl(host) ? url : null;
+};
 
 type SaveImagePayload = { url: string; filename?: string };
 
@@ -112,10 +124,24 @@ const saveImageToDevice = async ({ url, filename }: SaveImagePayload) => {
 const App = () => {
   const ref = useRef<WebView>(null);
   const [canGoBack, setCanGoBack] = useState(false);
+  const [sourceUri, setSourceUri] = useState(WEB_URL);
   const kakaoLoginInFlight = useRef(false);
 
   useEffect(() => {
     initializeKakaoSDK(KAKAO_APP_KEY);
+
+    const handleIncomingUrl = (url: string | null) => {
+      const target = url && toWebViewTarget(url);
+      if (target) {
+        setSourceUri(target);
+      }
+    };
+
+    Linking.getInitialURL().then(handleIncomingUrl);
+    const sub = Linking.addEventListener('url', ({ url }) =>
+      handleIncomingUrl(url),
+    );
+    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -164,9 +190,10 @@ const App = () => {
   };
 
   const postToWeb = (message: unknown) => {
+    const payload = typeof message === 'string' ? { type: message } : message;
     ref.current?.injectJavaScript(
       `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-        JSON.stringify(message),
+        JSON.stringify(payload),
       )} })); true;`,
     );
   };
@@ -246,6 +273,49 @@ const App = () => {
           console.error('[KakaoShare] shareFeedTemplate failed:', e);
           postToWeb({ type: 'KAKAO_SHARE_ERROR' });
         }
+      }
+      if (type === 'REQUEST_PHOTO_PICKER') {
+        const { payload } = JSON.parse(event.nativeEvent.data);
+        const maxCount: number = payload?.maxCount > 0 ? payload.maxCount : 1;
+        try {
+          const result = await launchImageLibrary({
+            mediaType: 'photo',
+            includeBase64: true,
+            selectionLimit: maxCount,
+          });
+
+          if (result.didCancel) {
+            postToWeb('PHOTO_PICKER_CANCELLED');
+            return;
+          }
+          if (result.errorCode) {
+            postToWeb(
+              result.errorCode === 'permission'
+                ? 'PHOTO_PICKER_PERMISSION_DENIED'
+                : 'PHOTO_PICKER_ERROR',
+            );
+            return;
+          }
+
+          const images = (result.assets ?? [])
+            .filter(asset => !!asset.base64)
+            .map(asset => ({
+              base64: asset.base64 as string,
+              fileName: asset.fileName ?? `${Date.now()}.jpg`,
+              mimeType: asset.type ?? 'image/jpeg',
+            }));
+
+          if (images.length === 0) {
+            postToWeb('PHOTO_PICKER_ERROR');
+            return;
+          }
+
+          postToWeb({ type: 'PHOTO_PICKER_RESULT', payload: { images } });
+        } catch (e) {
+          console.error('[PhotoPicker] failed:', e);
+          postToWeb('PHOTO_PICKER_ERROR');
+        }
+        return;
       }
       if (type === 'SAVE_IMAGE' || type === 'SAVE_IMAGES') {
         const { payload } = JSON.parse(event.nativeEvent.data);
@@ -410,7 +480,7 @@ const App = () => {
       <SafeAreaView style={{ flex: 1 }}>
         <WebView
           ref={ref}
-          source={{ uri: WEB_URL }}
+          source={{ uri: sourceUri }}
           renderLoading={() => <ActivityIndicator size="large" />}
           domStorageEnabled
           javaScriptEnabled
@@ -420,6 +490,7 @@ const App = () => {
           startInLoadingState
           setSupportMultipleWindows={false}
           pullToRefreshEnabled={Platform.OS === 'android'}
+          allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
           onNavigationStateChange={s => setCanGoBack(s.canGoBack)}
           onShouldStartLoadWithRequest={onShouldStart}
           onMessage={onMessage}
