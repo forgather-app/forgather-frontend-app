@@ -422,6 +422,7 @@ const App = () => {
           startInLoadingState
           setSupportMultipleWindows={false}
           pullToRefreshEnabled={Platform.OS === 'android'}
+          allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
           onNavigationStateChange={s => setCanGoBack(s.canGoBack)}
           onShouldStartLoadWithRequest={onShouldStart}
           onMessage={onMessage}
