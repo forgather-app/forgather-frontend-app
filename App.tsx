@@ -13,6 +13,7 @@ import {
   Platform,
 } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import appleAuth from '@invertase/react-native-apple-authentication';
@@ -205,6 +206,49 @@ const App = () => {
         } finally {
           kakaoLoginInFlight.current = false;
         }
+      }
+      if (type === 'REQUEST_PHOTO_PICKER') {
+        const { payload } = JSON.parse(event.nativeEvent.data);
+        const maxCount: number = payload?.maxCount > 0 ? payload.maxCount : 1;
+        try {
+          const result = await launchImageLibrary({
+            mediaType: 'photo',
+            includeBase64: true,
+            selectionLimit: maxCount,
+          });
+
+          if (result.didCancel) {
+            postToWeb('PHOTO_PICKER_CANCELLED');
+            return;
+          }
+          if (result.errorCode) {
+            postToWeb(
+              result.errorCode === 'permission'
+                ? 'PHOTO_PICKER_PERMISSION_DENIED'
+                : 'PHOTO_PICKER_ERROR',
+            );
+            return;
+          }
+
+          const images = (result.assets ?? [])
+            .filter(asset => !!asset.base64)
+            .map(asset => ({
+              base64: asset.base64 as string,
+              fileName: asset.fileName ?? `${Date.now()}.jpg`,
+              mimeType: asset.type ?? 'image/jpeg',
+            }));
+
+          if (images.length === 0) {
+            postToWeb('PHOTO_PICKER_ERROR');
+            return;
+          }
+
+          postToWeb({ type: 'PHOTO_PICKER_RESULT', payload: { images } });
+        } catch (e) {
+          console.error('[PhotoPicker] failed:', e);
+          postToWeb('PHOTO_PICKER_ERROR');
+        }
+        return;
       }
       if (type === 'SAVE_IMAGE' || type === 'SAVE_IMAGES') {
         const { payload } = JSON.parse(event.nativeEvent.data);
