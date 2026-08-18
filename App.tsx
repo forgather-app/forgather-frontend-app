@@ -29,7 +29,7 @@ const WEB_URL = 'https://dev.forgather.app';
 const KAKAO_APP_KEY = '6190bb85090cb16a87823f1431f26246';
 
 // TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
-const DEFAULT_SHARE_IMAGE_URL = 'https://dev.forgather.app/og-image.png';
+const DEFAULT_SHARE_IMAGE_URL = 'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
 
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
