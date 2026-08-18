@@ -51,6 +51,18 @@ PODS:
   - KakaoSDKCommon/Network (2.22.0):
     - Alamofire (~> 5.9.0)
     - KakaoSDKCommon/Common (= 2.22.0)
+  - KakaoSDKFriend (2.22.0):
+    - KakaoSDKFriendCore (= 2.22.0)
+    - KakaoSDKUser (= 2.22.0)
+  - KakaoSDKFriendCore (2.22.0)
+  - KakaoSDKShare (2.22.0):
+    - KakaoSDKCommon (= 2.22.0)
+    - KakaoSDKTemplate (= 2.22.0)
+  - KakaoSDKTalk (2.22.0):
+    - KakaoSDKTemplate (= 2.22.0)
+    - KakaoSDKUser (= 2.22.0)
+  - KakaoSDKTemplate (2.22.0):
+    - KakaoSDKCommon/Common (= 2.22.0)
   - KakaoSDKUser (2.22.0):
     - KakaoSDKAuth (= 2.22.0)
   - RCT-Folly (2024.11.18.00):
@@ -2695,6 +2707,128 @@ PODS:
     - SocketRocket
   - RNAppleAuthentication (2.5.1):
     - React-Core
+  - RNCKakaoCore (2.4.6):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - KakaoSDKCommon (= 2.22.0)
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
+  - RNCKakaoShare (2.4.6):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - KakaoSDKShare (= 2.22.0)
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - RNCKakaoCore
+    - RNCKakaoSocial
+    - SocketRocket
+    - Yoga
+  - RNCKakaoSocial (2.4.6):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - KakaoSDKFriend (= 2.22.0)
+    - KakaoSDKTalk (= 2.22.0)
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - RNCKakaoCore
+    - RNCKakaoUser
+    - SocketRocket
+    - Yoga
+  - RNCKakaoUser (2.4.6):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - KakaoSDKUser (= 2.22.0)
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - RNCKakaoCore
+    - SocketRocket
+    - Yoga
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
 
@@ -2784,6 +2918,10 @@ DEPENDENCIES:
   - ReactCodegen (from `build/generated/ios/ReactCodegen`)
   - ReactCommon/turbomodule/core (from `../node_modules/react-native/ReactCommon`)
   - "RNAppleAuthentication (from `../node_modules/@invertase/react-native-apple-authentication`)"
+  - "RNCKakaoCore (from `../node_modules/@react-native-kakao/core`)"
+  - "RNCKakaoShare (from `../node_modules/@react-native-kakao/share`)"
+  - "RNCKakaoSocial (from `../node_modules/@react-native-kakao/social`)"
+  - "RNCKakaoUser (from `../node_modules/@react-native-kakao/user`)"
   - SocketRocket (~> 0.7.1)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
@@ -2792,6 +2930,11 @@ SPEC REPOS:
     - Alamofire
     - KakaoSDKAuth
     - KakaoSDKCommon
+    - KakaoSDKFriend
+    - KakaoSDKFriendCore
+    - KakaoSDKShare
+    - KakaoSDKTalk
+    - KakaoSDKTemplate
     - KakaoSDKUser
     - SocketRocket
 
@@ -2965,6 +3108,14 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native/ReactCommon"
   RNAppleAuthentication:
     :path: "../node_modules/@invertase/react-native-apple-authentication"
+  RNCKakaoCore:
+    :path: "../node_modules/@react-native-kakao/core"
+  RNCKakaoShare:
+    :path: "../node_modules/@react-native-kakao/share"
+  RNCKakaoSocial:
+    :path: "../node_modules/@react-native-kakao/social"
+  RNCKakaoUser:
+    :path: "../node_modules/@react-native-kakao/user"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -2981,6 +3132,11 @@ SPEC CHECKSUMS:
   kakao-login: c7b882cd279ca11f5b3abd15d0e0fcb41a427108
   KakaoSDKAuth: 569b377eda622d93d4575240b8031cd658163eef
   KakaoSDKCommon: d57127c339fc79e73aa8b236a4c77211c29924f1
+  KakaoSDKFriend: bfd6b017e31a448fa12b3254690a0dc209685d9f
+  KakaoSDKFriendCore: 15335ad820ec06940dbe5be7f920123826234d03
+  KakaoSDKShare: cbbe89685ad799709d467845dcc488c115629f5e
+  KakaoSDKTalk: cf2af6650bc7d77aa6cc8dab1bd464f4fda0618d
+  KakaoSDKTemplate: 2b518d4875fb9b3e832d39e957e4e33cb27a9d36
   KakaoSDKUser: 043bcd7e91454ebf3bf64f150c430e6f65f0a08d
   RCT-Folly: 846fda9475e61ec7bcbf8a3fe81edfcaeb090669
   RCTDeprecation: a41bbdd9af30bf2e5715796b313e44ec43eefff1
@@ -3057,6 +3213,10 @@ SPEC CHECKSUMS:
   ReactCodegen: 3d48510bcef445f6403c0004047d4d9cbb915435
   ReactCommon: ac934cb340aee91282ecd6f273a26d24d4c55cae
   RNAppleAuthentication: a89c9804592b38ed4ab11f0aee68d05ba12ad432
+  RNCKakaoCore: eff64d5e2678239524947dc58ba223ca7bb5cded
+  RNCKakaoShare: 099531c70402bc64f748163e131d1163f2a2a9f6
+  RNCKakaoSocial: 509e60f99d908021c78c70e35a0f3c1a41eb3655
+  RNCKakaoUser: f0150602505afd232a60b1f4ffba92126673db79
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 5456bb010373068fc92221140921b09d126b116e
 

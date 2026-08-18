@@ -4,6 +4,8 @@ import {
   iosRequestAddOnlyGalleryPermission,
 } from '@react-native-camera-roll/camera-roll';
 import { login } from '@react-native-seoul/kakao-login';
+import { initializeKakaoSDK } from '@react-native-kakao/core';
+import { shareFeedTemplate } from '@react-native-kakao/share';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -23,6 +25,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 //   ? 'https://dev.forgather.app/login'
 //   : 'https://forgather.app';
 const WEB_URL = 'https://dev.forgather.app';
+
+// KakaoSDKCommon 초기화용 네이티브 앱 키. Info.plist(KAKAO_APP_KEY) / strings.xml(kakao_app_key)와 동일한 값.
+const KAKAO_APP_KEY = '6190bb85090cb16a87823f1431f26246';
+
+// TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
+const DEFAULT_SHARE_IMAGE_URL = 'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
 
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
@@ -54,6 +62,13 @@ const toWebViewTarget = (url: string) => {
 };
 
 type SaveImagePayload = { url: string; filename?: string };
+
+type KakaoSharePayload = {
+  title: string;
+  description?: string;
+  imageUrl?: string;
+  link: string;
+};
 
 const guessImageExtension = ({ filename, url }: SaveImagePayload) => {
   const match = (filename || url).match(/\.([a-zA-Z0-9]+)(?:\?.*)?$/);
@@ -113,6 +128,8 @@ const App = () => {
   const kakaoLoginInFlight = useRef(false);
 
   useEffect(() => {
+    initializeKakaoSDK(KAKAO_APP_KEY);
+
     const handleIncomingUrl = (url: string | null) => {
       const target = url && toWebViewTarget(url);
       if (target) {
@@ -175,7 +192,9 @@ const App = () => {
   const postToWeb = (message: unknown) => {
     const payload = typeof message === 'string' ? { type: message } : message;
     ref.current?.injectJavaScript(
-      `window.postMessage(${JSON.stringify(JSON.stringify(payload))}, '*'); true;`,
+      `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
+        JSON.stringify(payload),
+      )} })); true;`,
     );
   };
 
@@ -234,6 +253,27 @@ const App = () => {
           kakaoLoginInFlight.current = false;
         }
       }
+      if (type === 'KAKAO_SHARE') {
+        const { payload } = JSON.parse(event.nativeEvent.data) as {
+          payload: KakaoSharePayload;
+        };
+        try {
+          await shareFeedTemplate({
+            template: {
+              content: {
+                title: payload.title,
+                description: payload.description,
+                imageUrl: payload.imageUrl || DEFAULT_SHARE_IMAGE_URL,
+                link: { webUrl: payload.link, mobileWebUrl: payload.link },
+              },
+            },
+            useWebBrowserIfKakaoTalkNotAvailable: false,
+          });
+        } catch (e) {
+          console.error('[KakaoShare] shareFeedTemplate failed:', e);
+          postToWeb({ type: 'KAKAO_SHARE_ERROR' });
+        }
+      }
       if (type === 'REQUEST_PHOTO_PICKER') {
         const { payload } = JSON.parse(event.nativeEvent.data);
         const maxCount: number = payload?.maxCount > 0 ? payload.maxCount : 1;
@@ -285,14 +325,15 @@ const App = () => {
           for (const image of images) {
             await saveImageToDevice(image);
           }
-          postToWeb('SAVE_IMAGE_SUCCESS');
+          postToWeb({ type: 'SAVE_IMAGE_SUCCESS' });
         } catch (e) {
           console.error('[SaveImage] failed:', e);
-          postToWeb(
-            e instanceof PhotoPermissionDeniedError
-              ? 'SAVE_IMAGE_PERMISSION_DENIED'
-              : 'SAVE_IMAGE_ERROR',
-          );
+          postToWeb({
+            type:
+              e instanceof PhotoPermissionDeniedError
+                ? 'SAVE_IMAGE_PERMISSION_DENIED'
+                : 'SAVE_IMAGE_ERROR',
+          });
         }
       }
     } catch (e) {
