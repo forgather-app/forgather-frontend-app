@@ -144,12 +144,10 @@ const App = () => {
     return false;
   };
 
-  const postToWeb = (type: string) => {
-    const message = JSON.stringify({ type });
+  const postToWeb = (message: unknown) => {
+    const payload = typeof message === 'string' ? { type: message } : message;
     ref.current?.injectJavaScript(
-      `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
-        message,
-      )} })); true;`,
+      `window.postMessage(${JSON.stringify(JSON.stringify(payload))}, '*'); true;`,
     );
   };
 
@@ -316,12 +314,6 @@ const App = () => {
           };
         })(); true;
       `;
-
-  const postToWeb = (message: unknown) => {
-    ref.current?.injectJavaScript(
-      `window.postMessage(${JSON.stringify(JSON.stringify(message))}, '*'); true;`,
-    );
-  };
 
   const handleAppleLogin = async () => {
     if (!appleAuth.isSupported) {
