@@ -34,12 +34,24 @@ const DEFAULT_SHARE_IMAGE_URL = 'https://dysvfn6jyq7o7.cloudfront.net/images/og-
 
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
+// 애플이 내려주는 fullName이 한글(성이 이름보다 앞에 오는 표기) 이름인지 판별
+const isKoreanFullName = (value: string) => /[가-힣]/.test(value);
+
 const formatFullName = (
   fullName: { givenName?: string | null; familyName?: string | null } | null,
 ) => {
   if (!fullName) return null;
-  const parts = [fullName.givenName, fullName.familyName].filter(Boolean);
-  return parts.length ? parts.join(' ') : null;
+  const { givenName, familyName } = fullName;
+  const nameParts = [givenName, familyName].filter(Boolean);
+  if (!nameParts.length) return null;
+
+  // 한국어 이름은 "성+이름"을 띄어쓰기 없이 이어붙임 (예: 홍길동)
+  if (isKoreanFullName(nameParts.join(''))) {
+    return [familyName, givenName].filter(Boolean).join('');
+  }
+
+  // 그 외(영어 등)는 기존과 동일하게 "이름 성" 순서 유지
+  return nameParts.join(' ');
 };
 
 const MY_DOMAINS = ['dev.forgather.app', 'forgather.app', 'localhost'];
