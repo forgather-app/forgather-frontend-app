@@ -95,6 +95,7 @@ type KakaoSharePayload = {
   description?: string;
   imageUrl?: string;
   link: string;
+  buttonTitle?: string;
 };
 
 const guessImageExtension = ({ filename, url }: SaveImagePayload) => {
@@ -301,6 +302,14 @@ const App = () => {
                 imageUrl: payload.imageUrl || DEFAULT_SHARE_IMAGE_URL,
                 link: { webUrl: payload.link, mobileWebUrl: payload.link },
               },
+              buttons: payload.buttonTitle
+                ? [
+                    {
+                      title: payload.buttonTitle,
+                      link: { webUrl: payload.link, mobileWebUrl: payload.link },
+                    },
+                  ]
+                : undefined,
             },
             useWebBrowserIfKakaoTalkNotAvailable: false,
           });
