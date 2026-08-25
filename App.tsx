@@ -3,7 +3,7 @@ import {
   iosReadGalleryPermission,
   iosRequestAddOnlyGalleryPermission,
 } from '@react-native-camera-roll/camera-roll';
-import { login } from '@react-native-seoul/kakao-login';
+import { login } from '@react-native-kakao/user';
 import { initializeKakaoSDK } from '@react-native-kakao/core';
 import { shareFeedTemplate } from '@react-native-kakao/share';
 import React, { useEffect, useRef, useState } from 'react';
@@ -20,6 +20,7 @@ import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import SHA256 from 'crypto-js/sha256';
 
 // const WEB_URL = __DEV__
 //   ? 'https://dev.forgather.app/login'
@@ -41,6 +42,19 @@ const formatFullName = (
   if (!fullName) return null;
   const parts = [fullName.givenName, fullName.familyName].filter(Boolean);
   return parts.length ? parts.join(' ') : null;
+};
+
+// 카카오 로그인에 쓸 nonce(재전송 방지용 원본 값). 백엔드가 이 raw_nonce를
+// SHA-256 해싱한 값과 idToken의 nonce 클레임을 대조하므로, 카카오 SDK에는
+// 반드시 이 값의 SHA-256 해시를 넘기고, 백엔드에는 원본 값을 그대로 보내야 한다.
+const generateNonce = (length = 32) => {
+  const chars =
+    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
 };
 
 const MY_DOMAINS = ['dev.forgather.app', 'forgather.app', 'localhost'];
@@ -220,8 +234,12 @@ const App = () => {
         }
         kakaoLoginInFlight.current = true;
         try {
+          const rawNonce = generateNonce();
+          const hashedNonce = SHA256(rawNonce).toString();
           console.error('[KakaoLogin] calling native login()...');
-          const { accessToken, idToken } = await login();
+          const { accessToken, idToken } = await login({
+            nonce: hashedNonce,
+          });
           console.error(
             '[KakaoLogin] login() success, accessToken length:',
             accessToken?.length,
@@ -230,7 +248,11 @@ const App = () => {
           );
           const payload = JSON.stringify({
             type: 'KAKAO_TOKEN',
-            payload: { access_token: accessToken, id_token: idToken },
+            payload: {
+              access_token: accessToken,
+              id_token: idToken,
+              nonce: rawNonce,
+            },
           });
           console.error('[KakaoLogin] injecting KAKAO_TOKEN payload:', payload);
           ref.current?.injectJavaScript(
