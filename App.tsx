@@ -361,6 +361,12 @@ const App = () => {
         }
         return;
       }
+      if (type === 'LOGOUT') {
+        // 주입한 인증 토큰을 폐기한다. 이게 없으면 서버/쿠키 로그아웃 후에도
+        // injectedBefore가 Bearer를 계속 주입해 세션이 끊기지 않는다.
+        ref.current?.injectJavaScript('window.__accessToken = null; true;');
+        return;
+      }
       if (type === 'SAVE_IMAGE' || type === 'SAVE_IMAGES') {
         const { payload } = JSON.parse(event.nativeEvent.data);
         const images: SaveImagePayload[] =
@@ -403,6 +409,16 @@ const App = () => {
             } catch (e) {}
           }
 
+          // 로그아웃 응답을 보면 주입한 토큰을 폐기한다.
+          // 웹의 LOGOUT 브릿지 메시지를 놓치는 경우까지 커버하는 안전장치.
+          function clearTokenOnLogout(url, ok) {
+            try {
+              if (ok && url && String(url).indexOf('/auth/logout') !== -1) {
+                window.__accessToken = null;
+              }
+            } catch (e) {}
+          }
+
           window.open = function(url){ window.location.href = url; };
 
           var origFetch = window.fetch;
@@ -420,6 +436,7 @@ const App = () => {
             }
             return origFetch.apply(this, args).then(function(res) {
               return res.clone().text().then(captureToken).catch(function() {}).then(function() {
+                clearTokenOnLogout(url, res.ok);
                 try {
                   window.ReactNativeWebView.postMessage(JSON.stringify({
                     type: 'NET_LOG',
@@ -454,6 +471,7 @@ const App = () => {
             }
             xhr.addEventListener('loadend', function() {
               captureToken(xhr.responseText);
+              clearTokenOnLogout(xhr.__logUrl, xhr.status >= 200 && xhr.status < 300);
               try {
                 window.ReactNativeWebView.postMessage(JSON.stringify({
                   type: 'NET_LOG',
