@@ -527,7 +527,10 @@ const App = () => {
 
       postToWeb({ type: 'APPLE_TOKEN', payload });
     } catch (e: any) {
+      // 취소든 실패든 웹에 알려 로딩 상태를 해제하게 한다.
+      // (알리지 않으면 웹의 로그인 버튼이 계속 disabled로 고착됨)
       if (e?.code === appleAuth.Error.CANCELED) {
+        postToWeb({ type: 'APPLE_TOKEN_ERROR', payload: { canceled: true } });
         return;
       }
       postToWeb({
