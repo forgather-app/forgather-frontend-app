@@ -195,15 +195,11 @@ const App = () => {
       return false; // 외부 열기 금지
     }
 
-    if (
-      Platform.OS === 'ios' &&
-      req.navigationType === 'click' &&
-      !req.isTopFrame
-    ) {
-      ref.current?.injectJavaScript(
-        `window.location.href=${JSON.stringify(url)}; true;`,
-      );
-      return false;
+    // 최상위 프레임이 아닌 요청(iframe 로드 및 iframe 내부 네비게이션)은 항상
+    // WebView 안에서 처리한다. 유튜브 임베드 같은 서드파티 iframe을 외부로
+    // 내보내면 임베드 플레이어가 top-level 문서로 열려 재생이 깨진다(Error 153).
+    if (req.isTopFrame === false) {
+      return true;
     }
 
     try {
