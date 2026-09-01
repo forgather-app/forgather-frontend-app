@@ -8,7 +8,6 @@ import { initializeKakaoSDK } from '@react-native-kakao/core';
 import { shareFeedTemplate } from '@react-native-kakao/share';
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   BackHandler,
   Linking,
   PermissionsAndroid,
@@ -21,6 +20,7 @@ import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SHA256 from 'crypto-js/sha256';
+import SplashScreen from './components/SplashScreen';
 
 // const WEB_URL = __DEV__
 //   ? 'https://dev.forgather.app/login'
@@ -543,7 +543,7 @@ const App = () => {
           ref={ref}
           source={{ uri: sourceUri }}
           style={{ backgroundColor: BACKGROUND_COLOR }}
-          renderLoading={() => <ActivityIndicator size="large" />}
+          renderLoading={() => <SplashScreen />}
           domStorageEnabled
           javaScriptEnabled
           webviewDebuggingEnabled={__DEV__}
