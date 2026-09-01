@@ -17,9 +17,10 @@
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <imageView clipsSubviews="YES" userInteractionEnabled="NO" contentMode="scaleAspectFit" horizontalHuggingPriority="251" verticalHuggingPriority="251" image="SplashLogo" translatesAutoresizingMaskIntoConstraints="NO" id="Splash-Logo-1">
-                                <rect key="frame" x="81.5" y="379" width="227" height="105.5"/>
+                                <rect key="frame" x="91.5" y="377" width="210" height="98"/>
                                 <constraints>
                                     <constraint firstAttribute="width" secondItem="Splash-Logo-1" secondAttribute="height" multiplier="210:98" id="Splash-Logo-ar"/>
+                                    <constraint firstAttribute="width" constant="210" id="Splash-Logo-w"/>
                                 </constraints>
                             </imageView>
                         </subviews>
@@ -28,7 +29,6 @@
                         <constraints>
                             <constraint firstItem="Splash-Logo-1" firstAttribute="centerX" secondItem="Ze5-6b-2t3" secondAttribute="centerX" id="Splash-Logo-cx"/>
                             <constraint firstItem="Splash-Logo-1" firstAttribute="centerY" secondItem="Ze5-6b-2t3" secondAttribute="centerY" id="Splash-Logo-cy"/>
-                            <constraint firstItem="Splash-Logo-1" firstAttribute="width" secondItem="Ze5-6b-2t3" secondAttribute="width" multiplier="0.578" id="Splash-Logo-w"/>
                         </constraints>
                     </view>
                 </viewController>
