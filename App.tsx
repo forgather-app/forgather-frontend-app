@@ -227,11 +227,6 @@ const App = () => {
     try {
       const { type } = JSON.parse(event.nativeEvent.data);
       console.error('[KakaoLogin] parsed type:', type);
-      if (type === 'NET_LOG') {
-        const { payload } = JSON.parse(event.nativeEvent.data);
-        console.error('[NET_LOG]', JSON.stringify(payload));
-        return;
-      }
       if (type === 'APPLE_LOGIN') {
         handleAppleLogin();
         return;
@@ -358,9 +353,9 @@ const App = () => {
         return;
       }
       if (type === 'LOGOUT') {
-        // 주입한 인증 토큰을 폐기한다. 이게 없으면 서버/쿠키 로그아웃 후에도
-        // injectedBefore가 Bearer를 계속 주입해 세션이 끊기지 않는다.
-        ref.current?.injectJavaScript('window.__accessToken = null; true;');
+        // NOTE: 웹이 로그아웃 시 이 메시지를 보내지만, 더 이상 앱이 토큰을 주입하지
+        // 않으므로(injectedBefore 참고) 별도로 폐기할 것이 없다. 서버가 Set-Cookie로
+        // 쿠키를 만료시키는 것으로 로그아웃이 완결된다. 웹 계약 유지를 위해 no-op으로 둔다.
         return;
       }
       if (type === 'SAVE_IMAGE' || type === 'SAVE_IMAGES') {
@@ -387,101 +382,14 @@ const App = () => {
     }
   };
 
+  // WebView는 window.open으로 새 창을 못 여니 같은 창 내비게이션으로 대체한다.
+  // NOTE: 예전엔 여기서 로그인 응답 본문의 accessToken을 긁어 window.__accessToken에
+  // 저장하고 모든 요청에 Authorization: Bearer를 주입했으나(WKWebView 크로스 사이트
+  // 쿠키 우회책), 로그아웃 미완결·S3 업로드 400 등의 원인이 되어 제거했다.
+  // 인증은 서버가 내려주는 HttpOnly 쿠키(withCredentials)에만 의존한다.
   const injectedBefore = `
         (function() {
-          function captureToken(text) {
-            try {
-              var json = JSON.parse(text);
-              var token = json && json.data && json.data.accessToken;
-              if (token) {
-                window.__accessToken = token;
-                try {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'NET_LOG',
-                    payload: { url: '[TOKEN_CAPTURED]', tokenLength: token.length },
-                  }));
-                } catch (e) {}
-              }
-            } catch (e) {}
-          }
-
-          // 로그아웃 응답을 보면 주입한 토큰을 폐기한다.
-          // 웹의 LOGOUT 브릿지 메시지를 놓치는 경우까지 커버하는 안전장치.
-          function clearTokenOnLogout(url, ok) {
-            try {
-              if (ok && url && String(url).indexOf('/auth/logout') !== -1) {
-                window.__accessToken = null;
-              }
-            } catch (e) {}
-          }
-
           window.open = function(url){ window.location.href = url; };
-
-          var origFetch = window.fetch;
-          window.fetch = function() {
-            var args = arguments;
-            var url = args[0] && args[0].url ? args[0].url : args[0];
-            if (window.__accessToken) {
-              var init = Object.assign({}, args[1] || {});
-              var headers = new Headers(init.headers || {});
-              if (!headers.has('Authorization')) {
-                headers.set('Authorization', 'Bearer ' + window.__accessToken);
-              }
-              init.headers = headers;
-              args = [args[0], init];
-            }
-            return origFetch.apply(this, args).then(function(res) {
-              return res.clone().text().then(captureToken).catch(function() {}).then(function() {
-                clearTokenOnLogout(url, res.ok);
-                try {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'NET_LOG',
-                    payload: { url: String(url), status: res.status, ok: res.ok, cookies: document.cookie },
-                  }));
-                } catch (e) {}
-                return res;
-              });
-            }).catch(function(err) {
-              try {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'NET_LOG',
-                  payload: { url: String(url), error: String(err), cookies: document.cookie },
-                }));
-              } catch (e) {}
-              throw err;
-            });
-          };
-
-          var origOpen = XMLHttpRequest.prototype.open;
-          var origSend = XMLHttpRequest.prototype.send;
-          XMLHttpRequest.prototype.open = function(method, url) {
-            this.__logUrl = url;
-            return origOpen.apply(this, arguments);
-          };
-          XMLHttpRequest.prototype.send = function() {
-            var xhr = this;
-            if (window.__accessToken) {
-              try {
-                xhr.setRequestHeader('Authorization', 'Bearer ' + window.__accessToken);
-              } catch (e) {}
-            }
-            xhr.addEventListener('loadend', function() {
-              captureToken(xhr.responseText);
-              clearTokenOnLogout(xhr.__logUrl, xhr.status >= 200 && xhr.status < 300);
-              try {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'NET_LOG',
-                  payload: {
-                    url: String(xhr.__logUrl),
-                    status: xhr.status,
-                    cookies: document.cookie,
-                    responseText: String(xhr.responseText).slice(0, 500),
-                  },
-                }));
-              } catch (e) {}
-            });
-            return origSend.apply(this, arguments);
-          };
         })(); true;
       `;
 
