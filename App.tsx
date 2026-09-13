@@ -25,7 +25,7 @@ import SplashScreen from './components/SplashScreen';
 // const WEB_URL = __DEV__
 //   ? 'https://dev.forgather.app/login'
 //   : 'https://forgather.app';
-const WEB_URL = 'https://dev.forgather.app';
+const WEB_URL = 'https://forgather.app/v3/';
 const BACKGROUND_COLOR = '#1B1D1F';
 
 // KakaoSDKCommon 초기화용 네이티브 앱 키. Info.plist(KAKAO_APP_KEY) / strings.xml(kakao_app_key)와 동일한 값.
