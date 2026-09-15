@@ -1,4 +1,4 @@
-package com.forgatherapp
+package com.forgather.app
 
 import android.app.Application
 import com.facebook.react.PackageList
