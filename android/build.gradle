@@ -19,3 +19,11 @@ buildscript {
 }
 
 apply plugin: "com.facebook.react.rootproject"
+
+allprojects {
+    repositories {
+        // Kakao Android SDK (com.kakao.sdk:*) is not published to Maven Central;
+        // react-native-kakao's modules need this repo to resolve.
+        maven { url 'https://devrepo.kakao.com/nexus/content/groups/public/' }
+    }
+}
