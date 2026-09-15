@@ -484,7 +484,9 @@ const App = () => {
             Linking.openURL(nativeEvent.downloadUrl);
           }}
           injectedJavaScriptBeforeContentLoaded={injectedBefore}
-          userAgent={`ForgatherWebview/1.0 (iOS) WebView`}
+          userAgent={`ForgatherWebview/1.0 (${
+            Platform.OS === 'ios' ? 'iOS' : 'Android'
+          }) WebView`}
         />
       </SafeAreaView>
     </SafeAreaProvider>
