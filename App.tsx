@@ -10,6 +10,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
   Linking,
+  NativeModules,
   PermissionsAndroid,
   Platform,
 } from 'react-native';
@@ -101,6 +102,16 @@ type KakaoSharePayload = {
 const guessImageExtension = ({ filename, url }: SaveImagePayload) => {
   const match = (filename || url).match(/\.([a-zA-Z0-9]+)(?:\?.*)?$/);
   return match ? match[1].toLowerCase() : 'jpg';
+};
+
+// Android WebView는 CookieManager.flush()를 페이지 로드 완료 시점에만 호출한다
+// (RNCWebViewClient#onPageFinished). 로그인 성공 후 SPA 라우팅만 일어나면 이 시점이
+// 다시 오지 않아 세션 쿠키가 디스크에 반영되기 전에 앱이 종료되면 유실될 수 있으므로,
+// 웹이 로그인 확정을 알려올 때 네이티브에서 명시적으로 flush한다. iOS는 WKWebView가
+// sharedCookiesEnabled로 시스템 공유 쿠키 저장소를 쓰기 때문에 해당 없음.
+const flushAndroidCookies = () => {
+  if (Platform.OS !== 'android') return;
+  NativeModules.CookieFlush?.flush();
 };
 
 class PhotoPermissionDeniedError extends Error {}
@@ -350,6 +361,10 @@ const App = () => {
           console.error('[PhotoPicker] failed:', e);
           postToWeb('PHOTO_PICKER_ERROR');
         }
+        return;
+      }
+      if (type === 'AUTH_SESSION_CONFIRMED') {
+        flushAndroidCookies();
         return;
       }
       if (type === 'LOGOUT') {
