@@ -26,11 +26,11 @@ import SplashScreen from './components/SplashScreen';
 // const WEB_URL = __DEV__
 //   ? 'https://dev.forgather.app/login'
 //   : 'https://forgather.app';
-const WEB_URL = 'https://forgather.app/v3/';
+const WEB_URL = 'https://forgather.app';
 const BACKGROUND_COLOR = '#1B1D1F';
 
 // KakaoSDKCommon 초기화용 네이티브 앱 키. Info.plist(KAKAO_APP_KEY) / strings.xml(kakao_app_key)와 동일한 값.
-const KAKAO_APP_KEY = '6190bb85090cb16a87823f1431f26246';
+const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
 
 // TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
 const DEFAULT_SHARE_IMAGE_URL = 'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
