@@ -99,7 +99,28 @@ type KakaoSharePayload = {
   buttonTitle?: string;
 };
 
+const DATA_URL_EXTENSIONS: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+};
+
+const isDataUrl = (url: string) => url.startsWith('data:');
+
 const guessImageExtension = ({ filename, url }: SaveImagePayload) => {
+  // data: URL은 파일명/확장자가 없으므로 MIME 타입에서 확장자를 정한다.
+  // (filename을 먼저 보면 QR처럼 실제 인코딩과 다른 이름이 올 수 있다)
+  if (isDataUrl(url)) {
+    const separator = url.search(/[;,]/);
+    const mime = url.slice(
+      'data:'.length,
+      separator === -1 ? undefined : separator,
+    );
+    return DATA_URL_EXTENSIONS[mime.toLowerCase()] ?? 'png';
+  }
+
   const match = (filename || url).match(/\.([a-zA-Z0-9]+)(?:\?.*)?$/);
   return match ? match[1].toLowerCase() : 'jpg';
 };
@@ -118,11 +139,14 @@ class PhotoPermissionDeniedError extends Error {}
 
 const hasPhotoLibraryPermission = async () => {
   if (Platform.OS === 'android') {
-    const permission =
-      Platform.Version >= 33
-        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
-        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+    // Android 10(API 29)부터 camera-roll이 MediaStore로 저장하므로 런타임 권한이
+    // 필요 없다. 여기서 READ_MEDIA_IMAGES를 요구하면 Android 14의 "사진 선택"
+    // (부분 허용)에서 denied가 돌아와, 저장이 가능한 상황인데도 실패한다.
+    if (Number(Platform.Version) >= 29) {
+      return true;
+    }
 
+    const permission = PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE;
     if (await PermissionsAndroid.check(permission)) {
       return true;
     }
@@ -141,14 +165,50 @@ const hasPhotoLibraryPermission = async () => {
   return false;
 };
 
+// data: URL(예: canvas.toDataURL로 만든 QR 이미지)은 네트워크로 받을 수 없다.
+// 안드로이드 blob-util은 내부적으로 java.net.URL을 쓰는데 data 스킴을 몰라
+// MalformedURLException이 나고, 그 예외를 삼킨 채 URL 없이 요청을 만들어
+// 저장이 통째로 실패한다. (iOS는 NSURLSession이 data 스킴을 지원해 우연히 동작)
+// 그래서 base64를 직접 임시 파일로 써서 저장한다.
+const saveDataUrlToDevice = async (url: string, ext: string) => {
+  const commaIndex = url.indexOf(',');
+  if (commaIndex === -1) {
+    throw new Error('Malformed data URL');
+  }
+  if (!url.slice(0, commaIndex).includes(';base64')) {
+    throw new Error('Unsupported data URL encoding (base64 only)');
+  }
+
+  const path = `${
+    ReactNativeBlobUtil.fs.dirs.CacheDir
+  }/forgather_${Date.now()}.${ext}`;
+  await ReactNativeBlobUtil.fs.writeFile(
+    path,
+    url.slice(commaIndex + 1),
+    'base64',
+  );
+  try {
+    await CameraRoll.saveAsset(`file://${path}`, { type: 'photo' });
+  } finally {
+    ReactNativeBlobUtil.fs.unlink(path).catch(() => {});
+  }
+};
+
 const saveImageToDevice = async ({ url, filename }: SaveImagePayload) => {
   if (!(await hasPhotoLibraryPermission())) {
     throw new PhotoPermissionDeniedError('Photo library permission denied');
   }
 
+  const ext = guessImageExtension({ url, filename });
+
+  if (isDataUrl(url)) {
+    await saveDataUrlToDevice(url, ext);
+    return;
+  }
+
   const res = await ReactNativeBlobUtil.config({
     fileCache: true,
-    appendExt: guessImageExtension({ url, filename }),
+    appendExt: ext,
   }).fetch('GET', url);
 
   try {
@@ -308,7 +368,10 @@ const App = () => {
                 ? [
                     {
                       title: payload.buttonTitle,
-                      link: { webUrl: payload.link, mobileWebUrl: payload.link },
+                      link: {
+                        webUrl: payload.link,
+                        mobileWebUrl: payload.link,
+                      },
                     },
                   ]
                 : undefined,
