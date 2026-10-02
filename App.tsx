@@ -6,6 +6,7 @@ import {
 import { login } from '@react-native-kakao/user';
 import { initializeKakaoSDK } from '@react-native-kakao/core';
 import { shareFeedTemplate } from '@react-native-kakao/share';
+import * as Sentry from '@sentry/react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
@@ -18,10 +19,16 @@ import ReactNativeBlobUtil from 'react-native-blob-util';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import type {
+  WebViewErrorEvent,
+  WebViewHttpErrorEvent,
+  WebViewRenderProcessGoneEvent,
+} from 'react-native-webview/lib/WebViewTypes';
 import appleAuth from '@invertase/react-native-apple-authentication';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import SHA256 from 'crypto-js/sha256';
 import SplashScreen from './components/SplashScreen';
+import { posthog } from './monitoring';
 
 // const WEB_URL = __DEV__
 //   ? 'https://dev.forgather.app/login'
@@ -29,11 +36,12 @@ import SplashScreen from './components/SplashScreen';
 const WEB_URL = 'https://forgather.app';
 const BACKGROUND_COLOR = '#1B1D1F';
 
-// KakaoSDKCommon 초기화용 네이티브 앱 키. Info.plist(KAKAO_APP_KEY) / strings.xml(kakao_app_key)와 동일한 값.
+// KakaoSDKCommon 초기화용 네이티브 앱 키. Info.plist(KAKAO_APP_KEY) / strings.xml(kakao_app_key)와 동일한 값이어야 함.
 const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
 
 // TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
-const DEFAULT_SHARE_IMAGE_URL = 'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
+const DEFAULT_SHARE_IMAGE_URL =
+  'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
 
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
@@ -330,6 +338,7 @@ const App = () => {
             },
           });
           console.error('[KakaoLogin] injecting KAKAO_TOKEN payload:', payload);
+          posthog.capture('kakao_login_success');
           ref.current?.injectJavaScript(
             `window.dispatchEvent(new MessageEvent('message', { data: ${JSON.stringify(
               payload,
@@ -338,6 +347,11 @@ const App = () => {
           console.error('[KakaoLogin] injectJavaScript called');
         } catch (e) {
           console.error('[KakaoLogin] login() failed or cancelled:', e);
+          // NOTE: 카카오 SDK가 "사용자 취소"와 "실제 실패"를 구분하는 표준 에러 코드를
+          // 노출하지 않아 여기서는 구분하지 못한다. 취소가 잦아 노이즈가 크면 이
+          // flow 태그로 Sentry에서 필터링/뮤트하면 된다.
+          Sentry.captureException(e, { tags: { flow: 'kakao_login' } });
+          posthog.capture('kakao_login_failed');
           const errorPayload = JSON.stringify({
             type: 'KAKAO_LOGIN_ERROR',
             payload: { message: String(e) },
@@ -378,8 +392,11 @@ const App = () => {
             },
             useWebBrowserIfKakaoTalkNotAvailable: false,
           });
+          posthog.capture('kakao_share_success');
         } catch (e) {
           console.error('[KakaoShare] shareFeedTemplate failed:', e);
+          Sentry.captureException(e, { tags: { flow: 'kakao_share' } });
+          posthog.capture('kakao_share_failed');
           postToWeb({ type: 'KAKAO_SHARE_ERROR' });
         }
       }
@@ -398,6 +415,9 @@ const App = () => {
             return;
           }
           if (result.errorCode) {
+            posthog.capture('photo_picker_failed', {
+              errorCode: result.errorCode,
+            });
             postToWeb(
               result.errorCode === 'permission'
                 ? 'PHOTO_PICKER_PERMISSION_DENIED'
@@ -422,6 +442,8 @@ const App = () => {
           postToWeb({ type: 'PHOTO_PICKER_RESULT', payload: { images } });
         } catch (e) {
           console.error('[PhotoPicker] failed:', e);
+          Sentry.captureException(e, { tags: { flow: 'photo_picker' } });
+          posthog.capture('photo_picker_failed', { errorCode: 'exception' });
           postToWeb('PHOTO_PICKER_ERROR');
         }
         return;
@@ -444,19 +466,29 @@ const App = () => {
           for (const image of images) {
             await saveImageToDevice(image);
           }
+          posthog.capture('save_image_success', { count: images.length });
           postToWeb({ type: 'SAVE_IMAGE_SUCCESS' });
         } catch (e) {
           console.error('[SaveImage] failed:', e);
+          const isPermissionDenied = e instanceof PhotoPermissionDeniedError;
+          // NOTE: 권한 거부는 사용자의 정상적인 선택이라 버그가 아니다 — Sentry에는
+          // 남기지 않고 PostHog 지표로만 추적한다.
+          if (!isPermissionDenied) {
+            Sentry.captureException(e, { tags: { flow: 'save_image' } });
+          }
+          posthog.capture('save_image_failed', {
+            reason: isPermissionDenied ? 'permission_denied' : 'error',
+          });
           postToWeb({
-            type:
-              e instanceof PhotoPermissionDeniedError
-                ? 'SAVE_IMAGE_PERMISSION_DENIED'
-                : 'SAVE_IMAGE_ERROR',
+            type: isPermissionDenied
+              ? 'SAVE_IMAGE_PERMISSION_DENIED'
+              : 'SAVE_IMAGE_ERROR',
           });
         }
       }
     } catch (e) {
       console.error('[KakaoLogin] onMessage failed:', e);
+      Sentry.captureException(e, { tags: { flow: 'webview_message' } });
     }
   };
 
@@ -507,14 +539,19 @@ const App = () => {
         payload.full_name = fullName;
       }
 
+      posthog.capture('apple_login_success');
       postToWeb({ type: 'APPLE_TOKEN', payload });
     } catch (e: any) {
       // 취소든 실패든 웹에 알려 로딩 상태를 해제하게 한다.
       // (알리지 않으면 웹의 로그인 버튼이 계속 disabled로 고착됨)
       if (e?.code === appleAuth.Error.CANCELED) {
+        // NOTE: 사용자가 취소한 정상적인 케이스라 Sentry에는 남기지 않는다.
+        posthog.capture('apple_login_canceled');
         postToWeb({ type: 'APPLE_TOKEN_ERROR', payload: { canceled: true } });
         return;
       }
+      Sentry.captureException(e, { tags: { flow: 'apple_login' } });
+      posthog.capture('apple_login_failed');
       postToWeb({
         type: 'APPLE_TOKEN_ERROR',
         payload: { message: e?.message ?? 'Apple 로그인에 실패했습니다.' },
@@ -546,6 +583,39 @@ const App = () => {
           onFileDownload={({ nativeEvent }) => {
             Linking.openURL(nativeEvent.downloadUrl);
           }}
+          onError={({ nativeEvent }: WebViewErrorEvent) => {
+            Sentry.captureMessage(
+              `WebView load failed: ${nativeEvent.description}`,
+              'error',
+            );
+            posthog.capture('webview_load_failed', {
+              code: nativeEvent.code,
+              description: nativeEvent.description,
+              url: nativeEvent.url,
+            });
+          }}
+          onHttpError={({ nativeEvent }: WebViewHttpErrorEvent) => {
+            Sentry.captureMessage(
+              `WebView HTTP ${nativeEvent.statusCode}: ${nativeEvent.url}`,
+              'error',
+            );
+            posthog.capture('webview_http_error', {
+              statusCode: nativeEvent.statusCode,
+              url: nativeEvent.url,
+            });
+          }}
+          onRenderProcessGone={({
+            nativeEvent,
+          }: WebViewRenderProcessGoneEvent) => {
+            // Android 전용: WebView 렌더 프로세스가 죽으면 화면이 하얗게 멈춘다.
+            Sentry.captureMessage(
+              `WebView render process gone (didCrash: ${nativeEvent.didCrash})`,
+              'fatal',
+            );
+            posthog.capture('webview_render_process_gone', {
+              didCrash: nativeEvent.didCrash,
+            });
+          }}
           injectedJavaScriptBeforeContentLoaded={injectedBefore}
           userAgent={`ForgatherWebview/1.0 (${
             Platform.OS === 'ios' ? 'iOS' : 'Android'
@@ -556,4 +626,4 @@ const App = () => {
   );
 };
 
-export default App;
+export default Sentry.wrap(App);

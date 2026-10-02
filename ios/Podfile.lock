@@ -2824,6 +2824,35 @@ PODS:
     - RNCKakaoCore
     - SocketRocket
     - Yoga
+  - RNSentry (8.27.0):
+    - boost
+    - DoubleConversion
+    - fast_float
+    - fmt
+    - glog
+    - hermes-engine
+    - RCT-Folly
+    - RCT-Folly/Fabric
+    - RCTRequired
+    - RCTTypeSafety
+    - React-Core
+    - React-debug
+    - React-Fabric
+    - React-featureflags
+    - React-graphics
+    - React-hermes
+    - React-ImageManager
+    - React-jsi
+    - React-NativeModulesApple
+    - React-RCTFabric
+    - React-renderercss
+    - React-rendererdebug
+    - React-utils
+    - ReactCodegen
+    - ReactCommon/turbomodule/bridging
+    - ReactCommon/turbomodule/core
+    - SocketRocket
+    - Yoga
   - SocketRocket (0.7.1)
   - Yoga (0.0.0)
 
@@ -2916,6 +2945,7 @@ DEPENDENCIES:
   - "RNCKakaoShare (from `../node_modules/@react-native-kakao/share`)"
   - "RNCKakaoSocial (from `../node_modules/@react-native-kakao/social`)"
   - "RNCKakaoUser (from `../node_modules/@react-native-kakao/user`)"
+  - "RNSentry (from `../node_modules/@sentry/react-native`)"
   - SocketRocket (~> 0.7.1)
   - Yoga (from `../node_modules/react-native/ReactCommon/yoga`)
 
@@ -3108,6 +3138,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/@react-native-kakao/social"
   RNCKakaoUser:
     :path: "../node_modules/@react-native-kakao/user"
+  RNSentry:
+    :path: "../node_modules/@sentry/react-native"
   Yoga:
     :path: "../node_modules/react-native/ReactCommon/yoga"
 
@@ -3208,9 +3240,10 @@ SPEC CHECKSUMS:
   RNCKakaoShare: 099531c70402bc64f748163e131d1163f2a2a9f6
   RNCKakaoSocial: 509e60f99d908021c78c70e35a0f3c1a41eb3655
   RNCKakaoUser: f0150602505afd232a60b1f4ffba92126673db79
+  RNSentry: 082c8746b2678f1e210fbfa8f7a42a2e83f0dbaf
   SocketRocket: d4aabe649be1e368d1318fdf28a022d714d65748
   Yoga: 5456bb010373068fc92221140921b09d126b116e
 
-PODFILE CHECKSUM: e515aa528a68ff1828ed5d85e6b3a716ad125ebc
+PODFILE CHECKSUM: bc7db2d906844561b4ef40f3c2ec06f05540d92e
 
 COCOAPODS: 1.16.2
