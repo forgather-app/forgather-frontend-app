@@ -76,3 +76,7 @@ yarn-error.log
 
 # Claude Code local config
 .claude/
+
+# Sentry (auth token — 절대 커밋하지 않는다)
+sentry.properties
+.env.sentry-build-plugin

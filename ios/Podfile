@@ -17,6 +17,13 @@ end
 target 'forgatherApp' do
   config = use_native_modules!
 
+  # NOTE: Sentry RN wizard가 넣었던 use_modular_headers!(전역이든 Sentry pod
+  # 한정이든)를 전부 제거했다. @sentry/react-native는 Sentry.xcframework를 미리
+  # 컴파일된 바이너리로 가져오는데, modular_headers를 선언하면 CocoaPods가 소스로도
+  # 한 번 더 빌드해서 같은 라이브러리가 두 버전(바이너리+소스)으로 중복 설치되며
+  # "Include of non-modular header inside framework module 'Sentry'" 에러가 났다.
+  # 바이너리 프레임워크는 이미 완성된 Clang 모듈이라 애초에 필요 없는 설정이었다.
+
   use_react_native!(
     :path => config[:reactNativePath],
     # An absolute path to your application root.
