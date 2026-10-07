@@ -43,8 +43,6 @@ const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
 // TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
 const DEFAULT_SHARE_IMAGE_URL =
   'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
-const DEFAULT_SHARE_IMAGE_WIDTH = 500;
-const DEFAULT_SHARE_IMAGE_HEIGHT = 264;
 
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
@@ -376,8 +374,13 @@ const App = () => {
         };
         try {
           const imageUrl = payload.imageUrl || DEFAULT_SHARE_IMAGE_URL;
-          let imageWidth = payload.imageWidth ?? DEFAULT_SHARE_IMAGE_WIDTH;
-          let imageHeight = payload.imageHeight ?? DEFAULT_SHARE_IMAGE_HEIGHT;
+          let imageSize: { imageWidth: number; imageHeight: number } | undefined;
+          if (payload.imageWidth != null && payload.imageHeight != null) {
+            imageSize = {
+              imageWidth: payload.imageWidth,
+              imageHeight: payload.imageHeight,
+            };
+          }
           if (payload.imageWidth == null || payload.imageHeight == null) {
             try {
               const size = await new Promise<{ width: number; height: number }>(
@@ -389,10 +392,12 @@ const App = () => {
                   );
                 },
               );
-              imageWidth = payload.imageWidth ?? size.width;
-              imageHeight = payload.imageHeight ?? size.height;
+              imageSize = {
+                imageWidth: payload.imageWidth ?? size.width,
+                imageHeight: payload.imageHeight ?? size.height,
+              };
             } catch {
-              // 조회 실패 시 기본 크기를 사용한다.
+              // 조회 실패 시 이미지 크기를 생략한다.
             }
           }
           await shareFeedTemplate({
@@ -401,8 +406,7 @@ const App = () => {
                 title: payload.title,
                 description: payload.description,
                 imageUrl,
-                imageWidth,
-                imageHeight,
+                ...imageSize,
                 link: { webUrl: payload.link, mobileWebUrl: payload.link },
               },
               buttons: payload.buttonTitle
