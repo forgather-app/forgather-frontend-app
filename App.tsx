@@ -43,6 +43,9 @@ const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
 const DEFAULT_SHARE_IMAGE_URL =
   'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
 
+const DEFAULT_SHARE_IMAGE_WIDTH = 500;
+const DEFAULT_SHARE_IMAGE_HEIGHT = 264;
+
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
 // 애플이 내려주는 fullName이 한글(성이 이름보다 앞에 오는 표기) 이름인지 판별
@@ -103,6 +106,8 @@ type KakaoSharePayload = {
   title: string;
   description?: string;
   imageUrl?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   link: string;
   buttonTitle?: string;
 };
@@ -376,6 +381,8 @@ const App = () => {
                 title: payload.title,
                 description: payload.description,
                 imageUrl: payload.imageUrl || DEFAULT_SHARE_IMAGE_URL,
+                imageWidth: payload.imageWidth ?? DEFAULT_SHARE_IMAGE_WIDTH,
+                imageHeight: payload.imageHeight ?? DEFAULT_SHARE_IMAGE_HEIGHT,
                 link: { webUrl: payload.link, mobileWebUrl: payload.link },
               },
               buttons: payload.buttonTitle
