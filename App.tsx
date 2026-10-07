@@ -10,6 +10,7 @@ import * as Sentry from '@sentry/react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
+  Image,
   Linking,
   NativeModules,
   PermissionsAndroid,
@@ -42,7 +43,6 @@ const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
 // TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
 const DEFAULT_SHARE_IMAGE_URL =
   'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
-
 const DEFAULT_SHARE_IMAGE_WIDTH = 500;
 const DEFAULT_SHARE_IMAGE_HEIGHT = 264;
 
@@ -375,14 +375,34 @@ const App = () => {
           payload: KakaoSharePayload;
         };
         try {
+          const imageUrl = payload.imageUrl || DEFAULT_SHARE_IMAGE_URL;
+          let imageWidth = payload.imageWidth ?? DEFAULT_SHARE_IMAGE_WIDTH;
+          let imageHeight = payload.imageHeight ?? DEFAULT_SHARE_IMAGE_HEIGHT;
+          if (payload.imageWidth == null || payload.imageHeight == null) {
+            try {
+              const size = await new Promise<{ width: number; height: number }>(
+                (resolve, reject) => {
+                  Image.getSize(
+                    imageUrl,
+                    (width, height) => resolve({ width, height }),
+                    reject,
+                  );
+                },
+              );
+              imageWidth = payload.imageWidth ?? size.width;
+              imageHeight = payload.imageHeight ?? size.height;
+            } catch {
+              // 조회 실패 시 기본 크기를 사용한다.
+            }
+          }
           await shareFeedTemplate({
             template: {
               content: {
                 title: payload.title,
                 description: payload.description,
-                imageUrl: payload.imageUrl || DEFAULT_SHARE_IMAGE_URL,
-                imageWidth: payload.imageWidth ?? DEFAULT_SHARE_IMAGE_WIDTH,
-                imageHeight: payload.imageHeight ?? DEFAULT_SHARE_IMAGE_HEIGHT,
+                imageUrl,
+                imageWidth,
+                imageHeight,
                 link: { webUrl: payload.link, mobileWebUrl: payload.link },
               },
               buttons: payload.buttonTitle
