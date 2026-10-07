@@ -14,6 +14,7 @@ import {
   NativeModules,
   PermissionsAndroid,
   Platform,
+  StatusBar,
 } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
 import { launchImageLibrary } from 'react-native-image-picker';
@@ -561,11 +562,16 @@ const App = () => {
 
   return (
     <SafeAreaProvider>
-      <SafeAreaView style={{ flex: 1, backgroundColor: BACKGROUND_COLOR }}>
+      <StatusBar barStyle="light-content" />
+      <SafeAreaView
+        style={{ flex: 1, backgroundColor: BACKGROUND_COLOR }}
+        edges={Platform.OS === 'ios' ? [] : undefined}
+      >
         <WebView
           ref={ref}
           source={{ uri: sourceUri }}
           style={{ backgroundColor: BACKGROUND_COLOR }}
+          contentInsetAdjustmentBehavior="never"
           renderLoading={() => <SplashScreen />}
           domStorageEnabled
           javaScriptEnabled
