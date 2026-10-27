@@ -83,7 +83,7 @@ android {
         applicationId "com.forgather.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 12
+        versionCode 15
         versionName "1.0.0"
         manifestPlaceholders = [usesCleartextTraffic: "false"]
     }
