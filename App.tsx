@@ -91,6 +91,17 @@ const allowedHost = (host: string) =>
 const isOurWebUrl = (host: string) =>
   MY_DOMAINS.some(h => host === h || host.endsWith(`.${h}`));
 
+// 이 앱은 호스트 전용 흐름만 다루므로(WEB_URL이 항상 호스트 홈에서 시작), 자사
+// 도메인이라도 게스트 전용 라우트(/spaces/:spaceId/guest...)는 호스트의 인증된
+// 웹뷰 세션 안에서 열리면 안 된다. 설명/소개 텍스트에 박힌 게스트 링크를 호스트가
+// 누르면 외부 브라우저로 보낸다.
+const GUEST_PATH_PATTERN = /^\/spaces\/[^/]+\/guest(?:\/|$)/;
+
+const isGuestPath = (url: string) => {
+  const path = url.split('/').slice(3).join('/').split(/[?#]/)[0];
+  return GUEST_PATH_PATTERN.test(`/${path}`);
+};
+
 const toWebViewTarget = (url: string) => {
   if (!/^https?:\/\//i.test(url)) {
     return null;
@@ -288,6 +299,10 @@ const App = () => {
     try {
       const host = url.split('/')[2]?.split(':')[0] || '';
       if (allowedHost(host)) {
+        if (isOurWebUrl(host) && isGuestPath(url)) {
+          Linking.openURL(url).catch(() => {});
+          return false;
+        }
         return true;
       }
     } catch {}
