@@ -10,6 +10,7 @@ import * as Sentry from '@sentry/react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   BackHandler,
+  Image,
   Linking,
   NativeModules,
   PermissionsAndroid,
@@ -42,6 +43,7 @@ const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
 // TODO: 실제 웹사이트 기본 OG 이미지 URL로 교체
 const DEFAULT_SHARE_IMAGE_URL =
   'https://dysvfn6jyq7o7.cloudfront.net/images/og-image.png';
+const SHARE_IMAGE_SIZE_TIMEOUT_MS = 1000;
 
 const APPLE_FULL_NAME_STORAGE_KEY = 'appleFullName';
 
@@ -89,6 +91,17 @@ const allowedHost = (host: string) =>
 const isOurWebUrl = (host: string) =>
   MY_DOMAINS.some(h => host === h || host.endsWith(`.${h}`));
 
+// 이 앱은 호스트 전용 흐름만 다루므로(WEB_URL이 항상 호스트 홈에서 시작), 자사
+// 도메인이라도 게스트 전용 라우트(/spaces/:spaceId/guest...)는 호스트의 인증된
+// 웹뷰 세션 안에서 열리면 안 된다. 설명/소개 텍스트에 박힌 게스트 링크를 호스트가
+// 누르면 외부 브라우저로 보낸다.
+const GUEST_PATH_PATTERN = /^\/spaces\/[^/]+\/guest(?:\/|$)/;
+
+const isGuestPath = (url: string) => {
+  const path = url.split('/').slice(3).join('/').split(/[?#]/)[0];
+  return GUEST_PATH_PATTERN.test(`/${path}`);
+};
+
 const toWebViewTarget = (url: string) => {
   if (!/^https?:\/\//i.test(url)) {
     return null;
@@ -103,6 +116,8 @@ type KakaoSharePayload = {
   title: string;
   description?: string;
   imageUrl?: string;
+  imageWidth?: number;
+  imageHeight?: number;
   link: string;
   buttonTitle?: string;
 };
@@ -284,6 +299,10 @@ const App = () => {
     try {
       const host = url.split('/')[2]?.split(':')[0] || '';
       if (allowedHost(host)) {
+        if (isOurWebUrl(host) && isGuestPath(url)) {
+          Linking.openURL(url).catch(() => {});
+          return false;
+        }
         return true;
       }
     } catch {}
@@ -370,12 +389,50 @@ const App = () => {
           payload: KakaoSharePayload;
         };
         try {
+          const imageUrl = payload.imageUrl || DEFAULT_SHARE_IMAGE_URL;
+          let imageSize: { imageWidth: number; imageHeight: number } | undefined;
+          if (payload.imageWidth != null && payload.imageHeight != null) {
+            imageSize = {
+              imageWidth: payload.imageWidth,
+              imageHeight: payload.imageHeight,
+            };
+          }
+          if (payload.imageWidth == null || payload.imageHeight == null) {
+            try {
+              const size = await new Promise<{ width: number; height: number }>(
+                (resolve, reject) => {
+                  const timeout = setTimeout(
+                    () => reject(new Error('Share image size lookup timed out')),
+                    SHARE_IMAGE_SIZE_TIMEOUT_MS,
+                  );
+                  Image.getSize(
+                    imageUrl,
+                    (width, height) => {
+                      clearTimeout(timeout);
+                      resolve({ width, height });
+                    },
+                    error => {
+                      clearTimeout(timeout);
+                      reject(error);
+                    },
+                  );
+                },
+              );
+              imageSize = {
+                imageWidth: payload.imageWidth ?? size.width,
+                imageHeight: payload.imageHeight ?? size.height,
+              };
+            } catch {
+              // 조회 실패 또는 타임아웃 시 이미지 크기를 생략한다.
+            }
+          }
           await shareFeedTemplate({
             template: {
               content: {
                 title: payload.title,
                 description: payload.description,
-                imageUrl: payload.imageUrl || DEFAULT_SHARE_IMAGE_URL,
+                imageUrl,
+                ...imageSize,
                 link: { webUrl: payload.link, mobileWebUrl: payload.link },
               },
               buttons: payload.buttonTitle
