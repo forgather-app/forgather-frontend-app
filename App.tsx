@@ -17,6 +17,7 @@ import {
   Platform,
 } from 'react-native';
 import ReactNativeBlobUtil from 'react-native-blob-util';
+import DeviceInfo from 'react-native-device-info';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { WebView, WebViewMessageEvent } from 'react-native-webview';
@@ -36,6 +37,10 @@ import { posthog } from './monitoring';
 //   : 'https://forgather.app';
 const WEB_URL = 'https://forgather.app';
 const BACKGROUND_COLOR = '#1B1D1F';
+
+// 네이티브 빌드 버전(iOS MARKETING_VERSION / Android versionName). userAgent에 실어
+// 웹(forgather-frontend-web-v3)이 X-App-Version 헤더를 만들 때 파싱해 쓴다.
+const APP_VERSION = DeviceInfo.getVersion();
 
 // KakaoSDKCommon 초기화용 네이티브 앱 키. Info.plist(KAKAO_APP_KEY) / strings.xml(kakao_app_key)와 동일한 값이어야 함.
 const KAKAO_APP_KEY = 'd33bba1cac14ce268f4a342e04e5c8af';
@@ -674,7 +679,7 @@ const App = () => {
             });
           }}
           injectedJavaScriptBeforeContentLoaded={injectedBefore}
-          userAgent={`ForgatherWebview/1.0 (${
+          userAgent={`ForgatherWebview/${APP_VERSION} (${
             Platform.OS === 'ios' ? 'iOS' : 'Android'
           }) WebView`}
         />

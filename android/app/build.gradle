@@ -57,7 +57,7 @@ react {
 /**
  * Set this to true to Run Proguard on Release builds to minify the Java bytecode.
  */
-def enableProguardInReleaseBuilds = false
+def enableProguardInReleaseBuilds = true
 
 /**
  * The preferred build flavor of JavaScriptCore (JSC)
@@ -83,8 +83,8 @@ android {
         applicationId "com.forgather.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 15
-        versionName "1.0.0"
+        versionCode 17
+        versionName "1.0.1"
         manifestPlaceholders = [usesCleartextTraffic: "false"]
     }
     signingConfigs {
