@@ -35,7 +35,7 @@ import { posthog } from './monitoring';
 // const WEB_URL = __DEV__
 //   ? 'https://dev.forgather.app/login'
 //   : 'https://forgather.app';
-const WEB_URL = 'https://forgather.app';
+const WEB_URL = 'https://dev.forgather.app';
 const BACKGROUND_COLOR = '#1B1D1F';
 
 // 네이티브 빌드 버전(iOS MARKETING_VERSION / Android versionName). userAgent에 실어
@@ -470,6 +470,13 @@ const App = () => {
             mediaType: 'photo',
             includeBase64: true,
             selectionLimit: maxCount,
+            // 초고해상도 원본을 그대로 base64로 웹뷰에 넘기면, 웹의 webp 변환
+            // 과정(캔버스+WASM)이 순간적으로 수백MB~1GB대 메모리를 요구해 웹뷰
+            // 렌더 프로세스가 OOM으로 죽는 문제가 있었다(흰 화면 크래시). 네이티브
+            // 레벨에서 먼저 축소해 웹으로 넘어오는 이미지 자체를 작게 만든다.
+            maxWidth: 1920,
+            maxHeight: 1920,
+            quality: 1,
           });
 
           if (result.didCancel) {
@@ -670,6 +677,7 @@ const App = () => {
             nativeEvent,
           }: WebViewRenderProcessGoneEvent) => {
             // Android 전용: WebView 렌더 프로세스가 죽으면 화면이 하얗게 멈춘다.
+            // reload()로 자동 복구를 시도해 사용자가 직접 앱을 재시작하지 않아도 되게 한다.
             Sentry.captureMessage(
               `WebView render process gone (didCrash: ${nativeEvent.didCrash})`,
               'fatal',
@@ -677,6 +685,19 @@ const App = () => {
             posthog.capture('webview_render_process_gone', {
               didCrash: nativeEvent.didCrash,
             });
+            ref.current?.reload();
+          }}
+          onContentProcessDidTerminate={({ nativeEvent }) => {
+            // iOS 전용: WKWebView 콘텐츠 프로세스가 (대개 OOM으로) 종료되면 화면이
+            // 하얗게 멈춘다. Android의 onRenderProcessGone과 같은 상황의 iOS 대응.
+            Sentry.captureMessage(
+              `WebView content process terminated: ${nativeEvent.url}`,
+              'fatal',
+            );
+            posthog.capture('webview_content_process_terminated', {
+              url: nativeEvent.url,
+            });
+            ref.current?.reload();
           }}
           injectedJavaScriptBeforeContentLoaded={injectedBefore}
           userAgent={`ForgatherWebview/${APP_VERSION} (${
